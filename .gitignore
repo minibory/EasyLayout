@@ -1,0 +1,30 @@
+# Include your project-specific ignores in this file
+# Read about how to use .gitignore: https://help.github.com/articles/ignoring-files
+# Useful .gitignore templates: https://github.com/github/gitignore
+
+# 빌드 결과물 (Vercel이 직접 빌드)
+dist
+
+# 의존성 (npm install로 복원 가능)
+node_modules
+
+# 캐시
+.cache
+.parcel-cache
+
+# IDE
+.idea
+*.iml
+.vscode
+
+# Claude Code 메모리 (로컬 전용)
+.claude
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 환경변수 (추후 백엔드 연동 시)
+.env
+.env.local
+.env.*.local
