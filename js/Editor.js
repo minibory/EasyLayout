@@ -258,9 +258,10 @@ export class Editor {
       const shape = new Shape(this.placingType, x, y, w, h);
       shape.zIndex = this.shapes.length;
       this.shapes.push(shape);
-      this._select(shape.id);
       this._save();
       this._render();
+      this._setActiveTool('select');
+      this._select(shape.id);
     } else if (d.type === 'moving' || d.type === 'resizing' || d.type === 'rotating') {
       this._save();
     }
