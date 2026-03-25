@@ -8,7 +8,7 @@ export class Shape {
     this.y = y;
     this.width = width;
     this.height = height;
-    this.fill = '#c8d8f0';
+    this.fill = '#ffffff';
     this.stroke = '#5b8ce6';
     this.strokeWidth = 2;
     this.opacity = 1;

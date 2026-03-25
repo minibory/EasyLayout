@@ -35,8 +35,10 @@ export class Editor {
 
     this._initDOM();
     this._initEvents();
+    const restored = this._loadFromStorage();
     this._save(); // initial snapshot
     this._render();
+    if (restored) this._applyViewport();
   }
 
   // ── DOM Init ──────────────────────────────────────────────────────────────
@@ -97,6 +99,7 @@ export class Editor {
     document.getElementById('btn-load').addEventListener('click', () => document.getElementById('file-input').click());
     document.getElementById('file-input').addEventListener('change', e => this._importJSON(e));
     document.getElementById('btn-export-png').addEventListener('click', () => this._exportPNG());
+    document.getElementById('btn-reset').addEventListener('click', () => this._reset());
 
     // SVG mouse events
     svg.addEventListener('mousedown', e => this._onMouseDown(e));
@@ -194,6 +197,8 @@ export class Editor {
       };
     } else {
       this._deselect();
+      this._drag = { type: 'pan', sx: screenPt.x, sy: screenPt.y, vx0: this.vx, vy0: this.vy };
+      this.svg.classList.add('panning');
     }
   }
 
@@ -328,15 +333,16 @@ export class Editor {
 
     let { x, y, width: w, height: h } = s0;
 
+    const rdx = Math.round(dx), rdy = Math.round(dy);
     const h_map = {
-      nw: () => { x = snap(s0.x + dx, this.snapEnabled); y = snap(s0.y + dy, this.snapEnabled); w = s0.width - (x - s0.x); h = s0.height - (y - s0.y); },
-      ne: () => { y = snap(s0.y + dy, this.snapEnabled); w = snap(s0.width + dx, this.snapEnabled); h = s0.height - (y - s0.y); },
-      se: () => { w = snap(s0.width + dx, this.snapEnabled); h = snap(s0.height + dy, this.snapEnabled); },
-      sw: () => { x = snap(s0.x + dx, this.snapEnabled); w = s0.width - (x - s0.x); h = snap(s0.height + dy, this.snapEnabled); },
-      n:  () => { y = snap(s0.y + dy, this.snapEnabled); h = s0.height - (y - s0.y); },
-      s:  () => { h = snap(s0.height + dy, this.snapEnabled); },
-      e:  () => { w = snap(s0.width + dx, this.snapEnabled); },
-      w:  () => { x = snap(s0.x + dx, this.snapEnabled); w = s0.width - (x - s0.x); },
+      nw: () => { x = s0.x + rdx; y = s0.y + rdy; w = s0.width - rdx; h = s0.height - rdy; },
+      ne: () => { y = s0.y + rdy; w = s0.width + rdx; h = s0.height - rdy; },
+      se: () => { w = s0.width + rdx; h = s0.height + rdy; },
+      sw: () => { x = s0.x + rdx; w = s0.width - rdx; h = s0.height + rdy; },
+      n:  () => { y = s0.y + rdy; h = s0.height - rdy; },
+      s:  () => { h = s0.height + rdy; },
+      e:  () => { w = s0.width + rdx; },
+      w:  () => { x = s0.x + rdx; w = s0.width - rdx; },
     };
 
     if (h_map[d.handle]) h_map[d.handle]();
@@ -394,6 +400,38 @@ export class Editor {
   _save() {
     this.history.push(this.shapes.map(s => s.toJSON()));
     this._updateUndoRedo();
+    this._persist();
+  }
+
+  _reset() {
+    if (!confirm('모든 도형과 화면 위치를 초기화하시겠습니까?')) return;
+    this.shapes = [];
+    this.vx = 0; this.vy = 0; this.vz = 1;
+    this._deselect();
+    this._applyViewport();
+    this._save();
+    this._render();
+    localStorage.removeItem('easylayout');
+  }
+
+  _persist() {
+    try {
+      localStorage.setItem('easylayout', JSON.stringify({
+        shapes: this.shapes.map(s => s.toJSON()),
+        viewport: { vx: this.vx, vy: this.vy, vz: this.vz },
+      }));
+    } catch { /* 저장 실패 무시 */ }
+  }
+
+  _loadFromStorage() {
+    try {
+      const raw = localStorage.getItem('easylayout');
+      if (!raw) return false;
+      const { shapes, viewport } = JSON.parse(raw);
+      this.shapes = shapes.map(d => Shape.fromJSON(d));
+      if (viewport) { this.vx = viewport.vx; this.vy = viewport.vy; this.vz = viewport.vz; }
+      return true;
+    } catch { return false; }
   }
 
   _undo() {
@@ -469,16 +507,9 @@ export class Editor {
   // ── Viewport ──────────────────────────────────────────────────────────────
 
   _applyViewport() {
-    this.shapesLayer.setAttribute('transform', `translate(${this.vx},${this.vy}) scale(${this.vz})`);
-    this.selectionLayer.setAttribute('transform', `translate(${this.vx},${this.vy}) scale(${this.vz})`);
-    this.gridBg.setAttribute('transform', `translate(${this.vx % (100*this.vz)},${this.vy % (100*this.vz)}) scale(${this.vz})`);
-
-    // Update grid pattern sizes
-    const gs = document.getElementById('grid-small');
-    const gl = document.getElementById('grid-large');
-    if (gs) { gs.setAttribute('width', 20 * this.vz); gs.setAttribute('height', 20 * this.vz); }
-    if (gl) { gl.setAttribute('width', 100 * this.vz); gl.setAttribute('height', 100 * this.vz); }
-
+    const t = `translate(${this.vx},${this.vy}) scale(${this.vz})`;
+    this.shapesLayer.setAttribute('transform', t);
+    this.selectionLayer.setAttribute('transform', t);
     this.zoomIndicator.textContent = `${Math.round(this.vz * 100)}%`;
   }
 
